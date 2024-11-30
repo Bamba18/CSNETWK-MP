@@ -2,14 +2,33 @@ import java.io.*;
 import java.net.*;
 import java.util.Scanner;
 
+/**
+ * FileExchangeClient is a command-line client application for interacting with a file server.
+ * It supports connecting to a server, registering an alias, uploading files, downloading files,
+ * viewing server file listings, and checking connection status.
+ * <p>
+ * Usage:
+ * <ul>
+ * <li>Type /? for a list of available commands.</li>
+ * <li>Use /join to connect to a server.</li>
+ * </ul>
+ */
 public class FileExchangeClient {
     private static Socket clientSocket;
-    private static PrintWriter outStream;
-    private static BufferedReader inStream;
-    private static Scanner userScanner;
+    private static PrintWriter output;
+    private static BufferedReader input;
 
+    /**
+     * Main method that starts the File Exchange Client.
+     * Continuously listens for user input and executes corresponding commands.
+     *
+     * @param args Command-line arguments (not used).
+     */
     public static void main(String[] args) {
-        userScanner = new Scanner(System.in);
+        System.out.println("Welcome to the File Exchange Client!");
+        System.out.println("Type /? to see a list of available commands.");
+
+        Scanner userScanner = new Scanner(System.in);
 
         while (true) {
             System.out.print("> ");
@@ -19,55 +38,54 @@ public class FileExchangeClient {
                 if (userInput.startsWith("/join")) {
                     String[] params = userInput.split(" ");
                     if (params.length != 3) {
-                        System.out.println("/join <server_ip> <port>");
+                        System.out.println("Please use the correct format: /join <server_ip> <port>");
                         continue;
                     }
                     String serverIp = params[1];
-                    int serverPort = Integer.parseInt(params[2]);
-                    connectToServer(serverIp, serverPort);
+                    int portNumber = Integer.parseInt(params[2]);
+                    joinServer(serverIp, portNumber);
                 } else if (userInput.equals("/?")) {
-                    displayLocalHelp();
-                } else if (!isConnected() && !userInput.equals("/?")) {
-                    System.out.println("Not connected to a server. Use /join to connect.");
-                    continue;
+                    showHelpMenu();
+                } else if (!isServerConnected()) {
+                    System.out.println("You're not connected to a server. Use /join to start a connection.");
                 } else if (userInput.equals("/leave")) {
-                    disconnectFromServer();
+                    leaveServer();
                     break;
                 } else if (userInput.startsWith("/register")) {
                     String[] params = userInput.split(" ");
                     if (params.length != 2) {
-                        System.out.println("/register <handle>");
+                        System.out.println("Please use the correct format: /register <handle>");
                         continue;
                     }
-                    String aliasName = params[1];
-                    sendAlias(aliasName);
+                    String clientAlias = params[1];
+                    registerAlias(clientAlias);
                 } else if (userInput.startsWith("/store")) {
                     String[] params = userInput.split(" ");
                     if (params.length != 2) {
-                        System.out.println("/store <filename>");
+                        System.out.println("Please use the correct format: /store <filename>");
                         continue;
                     }
-                    String filePath = params[1];
-                    uploadFile(filePath);
+                    String fileName = params[1];
+                    uploadFile(fileName);
                 } else if (userInput.equals("/dir")) {
                     requestFileList();
                 } else if (userInput.startsWith("/get")) {
                     String[] params = userInput.split(" ");
                     if (params.length != 2) {
-                        System.out.println("/get <filename>");
+                        System.out.println("Please use the correct format: /get <filename>");
                         continue;
                     }
                     String fileName = params[1];
                     downloadFile(fileName);
                 } else if (userInput.equals("/status")) {
-                    checkSocketStatus();
+                    checkConnectionStatus();
                 } else {
-                    System.out.println("Unknown command. Type /? for help.");
+                    System.out.println("Command not recognized. Type /? for help.");
                 }
             } catch (IOException e) {
-                System.out.println("Client error: " + e.getMessage());
-                if (!isConnected()) {
-                    System.out.println("Disconnected from server. Use /join to reconnect.");
+                System.out.println("An error occurred: " + e.getMessage());
+                if (!isServerConnected()) {
+                    System.out.println("Connection lost. Use /join to reconnect.");
                     clientSocket = null;
                 }
             }
@@ -75,166 +93,198 @@ public class FileExchangeClient {
         userScanner.close();
     }
 
-    private static boolean isConnected() {
+    /**
+     * Checks if the client is currently connected to a server.
+     *
+     * @return {@code true} if the client is connected; {@code false} otherwise.
+     */
+    private static boolean isServerConnected() {
         return clientSocket != null && !clientSocket.isClosed() && clientSocket.isConnected();
     }
 
-    private static void connectToServer(String serverIp, int serverPort) throws IOException {
-        System.out.println("Attempting to connect to " + serverIp + ":" + serverPort);
+
+    /**
+     * Establishes a connection to the specified server using the given IP address and port number.
+     *
+     * @param serverIp The IP address of the server.
+     * @param portNumber The port number of the server.
+     * @throws IOException If an error occurs while connecting to the server.
+     */
+    private static void joinServer(String serverIp, int portNumber) throws IOException {
+        System.out.println("Connecting to server at " + serverIp + ":" + portNumber + "...");
         clientSocket = new Socket();
-        clientSocket.connect(new InetSocketAddress(serverIp, serverPort), 10000); // 10 second timeout
-        System.out.println("Socket connected");
-        outStream = new PrintWriter(clientSocket.getOutputStream(), true);
-        inStream = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-        System.out.println("Streams established");
-        String welcomeMessage = inStream.readLine();
-        System.out.println("Server welcome message: " + welcomeMessage);
+        clientSocket.connect(new InetSocketAddress(serverIp, portNumber), 10000); // 10-second timeout
+        System.out.println("Connection established successfully!");
+        output = new PrintWriter(clientSocket.getOutputStream(), true);
+        input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+        String welcomeMessage = input.readLine();
+        System.out.println("Server says: " + welcomeMessage);
     }
 
-    private static void disconnectFromServer() {
-        if (isConnected()) {
+    /**
+     * Disconnects the client from the server.
+     * Sends a leave command to the server and closes the connection.
+     */
+    private static void leaveServer() {
+        if (isServerConnected()) {
             try {
-                outStream.println("/leave");
-                System.out.println(inStream.readLine()); // Disconnection message from server
+                output.println("/leave");
+                System.out.println("Disconnecting from server...");
+                System.out.println(input.readLine()); // Disconnection message from server
                 clientSocket.close();
             } catch (IOException e) {
                 System.out.println("Error while disconnecting: " + e.getMessage());
             } finally {
                 clientSocket = null;
-                outStream = null;
-                inStream = null;
+                output = null;
+                input = null;
+                System.out.println("You have been disconnected.");
             }
         } else {
-            System.out.println("Already disconnected.");
+            System.out.println("You're already disconnected.");
         }
     }
 
-    private static void sendAlias(String aliasName) {
-        outStream.println("/register " + aliasName);
+    /**
+     * Registers a client alias with the server.
+     *
+     * @param clientAlias The alias to register.
+     */
+    private static void registerAlias(String clientAlias) {
+        output.println("/register " + clientAlias);
         try {
-            System.out.println(inStream.readLine()); // Welcome message from server
+            System.out.println(input.readLine()); // Welcome message from server
         } catch (IOException e) {
-            System.out.println("Client error: " + e.getMessage());
+            System.out.println("Failed to register alias: " + e.getMessage());
         }
     }
 
-    private static void uploadFile(String filePath) throws IOException {
-        if (!isConnected()) {
-            System.out.println("Not connected to server. Please connect first.");
+    /**
+     * Uploads a file to the server.
+     * Sends the file contents to the server after initiating the transfer.
+     *
+     * @param fileName The name of the file to upload.
+     * @throws IOException If an error occurs during the upload process.
+     */
+    private static void uploadFile(String fileName) throws IOException {
+        if (!isServerConnected()) {
+            System.out.println("Please connect to the server before uploading a file.");
             return;
         }
 
-        File file = new File(filePath);
+        File file = new File(fileName);
         if (!file.exists()) {
-            System.out.println("File not found: " + filePath);
+            System.out.println("The file \"" + fileName + "\" was not found.");
             return;
         }
-        
-        System.out.println("Sending store command to server...");
-        outStream.println("/store " + file.getName());
-        outStream.flush();
 
-        System.out.println("Waiting for server response...");
-        String response = inStream.readLine();
+        System.out.println("Preparing to upload \"" + fileName + "\"...");
+        output.println("/store " + file.getName());
+        output.flush();
+
+        String response = input.readLine();
         if (response == null) {
-            System.out.println("Connection lost. Server did not respond.");
-            disconnectFromServer();
+            System.out.println("No response from the server. Upload aborted.");
+            leaveServer();
             return;
         }
 
-        System.out.println("Server response: " + response);
         if (!response.equals("READY_TO_RECEIVE")) {
-            System.out.println("File transfer initiation failed. Server response: " + response);
+            System.out.println("Server could not initiate upload. Response: " + response);
             return;
         }
 
-        System.out.println("Starting file transfer...");
         try (BufferedReader br = new BufferedReader(new FileReader(file))) {
             String line;
             while ((line = br.readLine()) != null) {
-                outStream.println(line);
+                output.println(line);
             }
-            outStream.println("END_OF_FILE");
-            outStream.flush();
+            output.println("END_OF_FILE");
         }
-        System.out.println("File transfer complete.");
+        System.out.println("Upload of \"" + fileName + "\" completed!");
 
-        System.out.println("Waiting for upload confirmation...");
-        response = inStream.readLine();
-        if (response == null) {
-            System.out.println("Connection lost. Server did not confirm upload.");
-            disconnectFromServer();
-        } else {
-            System.out.println("Server confirmation: " + response);
-        }
+        response = input.readLine();
+        System.out.println("Server confirmation: " + response);
     }
 
+    /**
+     * Requests a list of available files on the server.
+     * Outputs the file list to the console.
+     */
     private static void requestFileList() {
-        outStream.println("/dir");
+        output.println("/dir");
         try {
+            System.out.println("Fetching file list from the server...");
             String response;
-            while (!(response = inStream.readLine()).equals("END_OF_LIST")) {
+            while (!(response = input.readLine()).equals("END_OF_LIST")) {
                 System.out.println(response);
             }
         } catch (IOException e) {
-            System.out.println("Client error: " + e.getMessage());
+            System.out.println("Could not fetch file list: " + e.getMessage());
         }
     }
 
+    /**
+     * Downloads a specified file from the server.
+     * Saves the file locally after receiving its contents.
+     *
+     * @param fileName The name of the file to download.
+     * @throws IOException If an error occurs during the download process.
+     */
     private static void downloadFile(String fileName) throws IOException {
-        outStream.println("/get " + fileName);
+        output.println("/get " + fileName);
 
-        String response = inStream.readLine();
+        String response = input.readLine();
         if (!response.equals("READY_TO_SEND")) {
-            System.out.println(response);
+            System.out.println("Server response: " + response);
             return;
         }
 
-        System.out.println("Receiving file contents:");
-        System.out.println("------------------------");
-
+        System.out.println("Downloading \"" + fileName + "\"...");
         StringBuilder fileContents = new StringBuilder();
         String line;
-        while (!(line = inStream.readLine()).equals("END_OF_FILE")) {
-            System.out.println(line);
+        while (!(line = input.readLine()).equals("END_OF_FILE")) {
             fileContents.append(line).append("\n");
         }
 
-        System.out.println("------------------------");
-
-        try (FileWriter fw = new FileWriter(new File(fileName))) {
+        try (FileWriter fw = new FileWriter(fileName)) {
             fw.write(fileContents.toString());
         }
-
-        System.out.println("File download complete. Contents saved to " + fileName);
-        System.out.println(inStream.readLine()); 
+        System.out.println("Download complete. File saved as \"" + fileName + "\".");
     }
 
-    private static void displayLocalHelp() {
+
+    /**
+     * Displays a list of available commands and their descriptions.
+     * Provides guidance for using the application.
+     */
+    private static void showHelpMenu() {
         System.out.println("Available commands:");
         System.out.println("/join <server_ip> <port> - Connect to a server");
         System.out.println("/leave - Disconnect from the server");
-        System.out.println("/register <username> - Set your username on the server");
+        System.out.println("/register <handle> - Register your alias with the server");
         System.out.println("/store <filename> - Upload a file to the server");
-        System.out.println("/dir - List files on the server");
+        System.out.println("/dir - View files available on the server");
         System.out.println("/get <filename> - Download a file from the server");
         System.out.println("/? - Display this help message");
         System.out.println("/status - Check connection status");
-        
-        if (!isConnected()) {
-            System.out.println("\nNot connected to a server. Use /join to connect.");
+
+        if (!isServerConnected()) {
+            System.out.println("\nNote: You are not connected to a server.");
         }
     }
 
-    private static void checkSocketStatus() {
+    /**
+     * Checks and displays the status of the client's socket connection.
+     * Includes details about whether the connection is open, closed, or shut down.
+     */
+    private static void checkConnectionStatus() {
         if (clientSocket != null) {
-            System.out.println("Socket status:");
-            System.out.println("  Is connected: " + clientSocket.isConnected());
-            System.out.println("  Is closed: " + clientSocket.isClosed());
-            System.out.println("  Input shutdown: " + clientSocket.isInputShutdown());
-            System.out.println("  Output shutdown: " + clientSocket.isOutputShutdown());
+            System.out.println("Connection Status:");
+            System.out.println("  Connected: " + clientSocket.isConnected());
+            System.out.println("  Closed: " + clientSocket.isClosed());
         } else {
-            System.out.println("Socket is null");
+            System.out.println("You are not currently connected to a server.");
         }
     }
 }
