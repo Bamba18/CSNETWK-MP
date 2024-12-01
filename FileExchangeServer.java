@@ -87,7 +87,7 @@ class ClientHandler extends Thread {
             }
 
             clientSocket.close(); // Close the connection when done
-            System.out.println("Client" clientAlias + " has disconnected.");
+            System.out.println("Client" + clientAlias + " has disconnected.");
         } catch (IOException ex) {
             System.out.println("Error handling client: " + ex.getMessage());
         }
@@ -135,7 +135,7 @@ class ClientHandler extends Thread {
      */
     private void prepareReceiveFile(String message) throws IOException {
         String fileName = message.split(" ")[1]; // Extract the filename
-        output.println("Preparing to receive file: ");
+        output.println("READY_TO_RECEIVE"); // Inform the client that the server is ready
         receiveFile(fileName);
     }
 
@@ -156,7 +156,7 @@ class ClientHandler extends Thread {
 
         String timeStamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
         output.println(clientAlias + " uploaded succesfully " + fileName + " at " + timeStamp);
-        System.out.println("Client" clientAlias + " uploaded file " + fileName + " at " + timeStamp);
+        System.out.println("Client" + clientAlias + " uploaded file " + fileName + " at " + timeStamp);
     }
 
     /**
@@ -173,7 +173,7 @@ class ClientHandler extends Thread {
         } else {
             output.println("No files are currently available.");
         }
-        output.println("End of file list.");
+        output.println("END_OF_LIST"); 
     }
 
     /**
