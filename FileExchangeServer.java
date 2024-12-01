@@ -78,7 +78,7 @@ class ClientHandler extends Thread {
             input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             output = new PrintWriter(clientSocket.getOutputStream(), true);
 
-            output.println("Successfully connected to the File Exchange Server!");
+            output.println("Welcome! You are now connected to the File Exchange Server.");
 
             String clientMessage;
             // Continuously listen for client commands until the connection is closed
@@ -87,9 +87,9 @@ class ClientHandler extends Thread {
             }
 
             clientSocket.close(); // Close the connection when done
-            System.out.println(clientAlias + " has disconnected.");
+            System.out.println("Client" clientAlias + " has disconnected.");
         } catch (IOException ex) {
-            System.out.println("Client handler error: " + ex.getMessage());
+            System.out.println("Error handling client: " + ex.getMessage());
         }
     }
 
@@ -113,7 +113,7 @@ class ClientHandler extends Thread {
         } else if (message.equals("/?")) {
             displayHelp();
         } else {
-            output.println("Unknown command. Type /? for help.");
+            output.println("Invalid command. Use '/?' for a list of available commands.");
         }
     }
 
@@ -124,7 +124,7 @@ class ClientHandler extends Thread {
      */
     private void registerClientAlias(String message) {
         clientAlias = message.split(" ")[1]; // Extract the alias
-        output.println("Welcome " + clientAlias + "!");
+        output.println("Registration successful. Welcome, " + clientAlias + "!");
     }
 
     /**
@@ -135,7 +135,7 @@ class ClientHandler extends Thread {
      */
     private void prepareReceiveFile(String message) throws IOException {
         String fileName = message.split(" ")[1]; // Extract the filename
-        output.println("READY_TO_RECEIVE");
+        output.println("Preparing to receive file: ");
         receiveFile(fileName);
     }
 
@@ -155,8 +155,8 @@ class ClientHandler extends Thread {
         }
 
         String timeStamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-        output.println(clientAlias + " uploaded " + fileName + " at " + timeStamp);
-        System.out.println(clientAlias + " uploaded " + fileName + " at " + timeStamp);
+        output.println(clientAlias + " uploaded succesfully " + fileName + " at " + timeStamp);
+        System.out.println("Client" clientAlias + " uploaded file " + fileName + " at " + timeStamp);
     }
 
     /**
@@ -171,9 +171,9 @@ class ClientHandler extends Thread {
                 output.println(file);
             }
         } else {
-            output.println("No files available.");
+            output.println("No files are currently available.");
         }
-        output.println("END_OF_LIST");
+        output.println("End of file list.");
     }
 
     /**
@@ -186,7 +186,7 @@ class ClientHandler extends Thread {
         String fileName = message.split(" ")[1]; // Extract the filename
         File file = new File(storageDirectory + fileName);
         if (!file.exists()) {
-            output.println("This file is not found: " + fileName);
+            output.println("File not found:" + fileName);
             return;
         }
         output.println("READY_TO_SEND");
@@ -209,8 +209,8 @@ class ClientHandler extends Thread {
         }
 
         String timeStamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-        output.println("File " + file.getName() + " sent to " + clientAlias + " at " + timeStamp);
-        System.out.println("File " + file.getName() + " sent to " + clientAlias + " at " + timeStamp);
+        output.println("File " + file.getName() + " sent succesfully to " + clientAlias + " at " + timeStamp);
+        System.out.println("File " + file.getName() + " sent to client " + clientAlias + " at " + timeStamp);
     }
 
     /**
